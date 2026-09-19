@@ -6,6 +6,13 @@ using InteractiveUtils: clipboard
 
 export cliptable, cliparray, mwetable, mwearray, @mwetable, @mwearray
 
+# `CSV.write` terminates the last row with `newline`; the clipboard should not
+# carry that trailing separator.
+function chopnewline(s, newline)
+    nl = string(newline)
+    endswith(s, nl) ? chop(s, tail = length(nl)) : s
+end
+
 """
     cliptable(; kwargs...)
 
@@ -107,10 +114,10 @@ a   b
 3   300
 ```
 """
-function cliptable(t; returnstring = false, delim = '\t', kwargs...)
+function cliptable(t; returnstring = false, delim = '\t', newline = '\n', kwargs...)
     io = IOBuffer()
-    CSV.write(io, t; delim = delim, kwargs...)
-    s = chop(String(take!(io)), tail = 1)
+    CSV.write(io, t; delim = delim, newline = newline, kwargs...)
+    s = chopnewline(String(take!(io)), newline)
     clipboard(s)
 
     if returnstring == true
@@ -143,13 +150,13 @@ julia> cliparray()
 ```
 """
 function cliparray(t::AbstractVecOrMat; returnstring = false, delim='\t',
-                   header=false, kwargs...)
+                   header=false, newline='\n', kwargs...)
     if t isa AbstractVector
         t = reshape(t, :, 1)
     end
     io = IOBuffer()
-    CSV.write(io, Tables.table(t); delim=delim, header=header, kwargs...)
-    s = chop(String(take!(io)), tail = 1)
+    CSV.write(io, Tables.table(t); delim=delim, header=header, newline=newline, kwargs...)
+    s = chopnewline(String(take!(io)), newline)
     clipboard(s)
 
     if returnstring == true

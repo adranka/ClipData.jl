@@ -356,6 +356,24 @@ end
     cliptable(t, missingstring="-1", transform=(col, val) -> something(val, missing))
 
     @test clipboard() == "a\tb\n1\t-1\n-1\t4"
+
+    # A non-default `newline` is stripped whole, rather than one character of it
+    t = (a = [1, 2], b = [3, 4])
+
+    cliptable(t)
+    @test clipboard() == "a\tb\n1\t3\n2\t4"
+
+    cliptable(t; newline = "\r\n")
+    @test clipboard() == "a\tb\r\n1\t3\r\n2\t4"
+    @test Tables.columntable(cliptable()) == t
+
+    cliparray([1 2; 3 4]; newline = "\r\n")
+    @test clipboard() == "1\t2\r\n3\t4"
+    @test cliparray() == [1 2; 3 4]
+
+    cliparray([1, 2, 3]; newline = "\r\n")
+    @test clipboard() == "1\r\n2\r\n3"
+    @test cliparray() == [1, 2, 3]
 end
 
 @testset "strings" begin
