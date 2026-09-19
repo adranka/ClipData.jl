@@ -6,6 +6,17 @@ using InteractiveUtils: clipboard
 
 export cliptable, cliparray, mwetable, mwearray, @mwetable, @mwearray
 
+# Every `mwetable`/`mwearray` method ends the same way: hand back the generated
+# code, or print it to `io`.
+@inline function mwestring(io, s, returnstring)
+    if returnstring == true
+        return s
+    else
+        print(io, s)
+        return nothing
+    end
+end
+
 # `CSV.write` terminates the last row with `newline`; the clipboard should not
 # carry that trailing separator.
 function chopnewline(s, newline)
@@ -86,6 +97,11 @@ julia> cliparray()
 """
 function cliparray(; kwargs...)
     t = CSV.File(IOBuffer(clipboard()); header=false, kwargs...)
+    # An empty clipboard parses to zero columns, which `Tables.matrix` has no
+    # element type to promote to.
+    if isempty(Tables.columnnames(t))
+        return Any[]
+    end
     mat = Tables.matrix(t)
     if size(mat, 2) == 1 || size(mat, 1) == 1
         return vec(mat)
@@ -247,12 +263,7 @@ $name = \"\"\"
     print(main_io, end_str)
     s = String(take!(main_io))
 
-    if returnstring == true
-      return s
-    else
-      print(io, s)
-      return nothing
-    end
+    return mwestring(io, s, returnstring)
 end
 
 mwetable(t; kwargs...) = mwetable(stdout, t; kwargs...)
@@ -361,6 +372,10 @@ X = \"\"\"
 ```
 """
 function mwearray(io::IO, t::AbstractMatrix; returnstring=false, name=:X)
+    if isempty(t)
+        return mwestring(io, "$name = Matrix{$(eltype(t))}(undef, $(size(t, 1)), $(size(t, 2)))", returnstring)
+    end
+
     main_io = IOBuffer()
     array_io = IOBuffer()
 
@@ -377,12 +392,7 @@ $name = \"\"\"
     print(main_io, end_str)
     s = String(take!(main_io))
 
-    if returnstring == true
-      return s
-    else
-      print(io, s)
-      return nothing
-    end
+    return mwestring(io, s, returnstring)
 end
 
 """
@@ -407,6 +417,10 @@ x = \"\"\"
 ```
 """
 function mwearray(io::IO, t::AbstractVector; returnstring=false, name=:x)
+    if isempty(t)
+        return mwestring(io, "$name = $(eltype(t))[]", returnstring)
+    end
+
     main_io = IOBuffer()
     array_io = IOBuffer()
 
@@ -425,12 +439,7 @@ $name = \"\"\"
     print(main_io, end_str)
     s = String(take!(main_io))
 
-    if returnstring == true
-      return s
-    else
-      print(io, s)
-      return nothing
-    end
+    return mwestring(io, s, returnstring)
 end
 
 mwearray(t::Union{AbstractVector, AbstractMatrix}; kwargs...) = mwearray(stdout, t; kwargs...)

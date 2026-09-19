@@ -345,6 +345,45 @@ end
     end == expected_array
 end
 
+@testset "empty clipboard" begin
+    # An empty clipboard parses to zero columns; `Tables.matrix` used to throw
+    # "reducing over an empty collection" from inside `cliparray`.
+    for cb in ["", "\n", "\n\n"]
+        clipboard(cb)
+        @test cliparray() == []
+        @test cliparray() isa AbstractVector
+        @test Tables.columntable(cliptable()) == NamedTuple()
+    end
+
+    # Whitespace is a delimiter, not emptiness, so it still parses.
+    "  " |> clipboard
+    @test cliparray() ≅ [missing, missing, missing]
+
+    # An empty array has no CSV representation, so the MWE is a literal. It has
+    # to be code that actually runs.
+    clipboard("")
+    @test mwearray(; returnstring = true) == "x = Any[]"
+    @test eval_mwe(mwearray(; returnstring = true), :x) == Any[]
+
+    @test mwearray(Int[]; returnstring = true) == "x = Int64[]"
+    @test eval_mwe(mwearray(Int[]; returnstring = true), :x) == Int[]
+
+    X = Matrix{Float64}(undef, 0, 3)
+    @test mwearray(X; returnstring = true) == "X = Matrix{Float64}(undef, 0, 3)"
+    @test eval_mwe(mwearray(X; returnstring = true), :X) == X
+
+    # `name` and `io` are honored on the empty path too.
+    @test mwearray(Int[]; name = :myvec, returnstring = true) == "myvec = Int64[]"
+    io = IOBuffer()
+    mwearray(io, Int[])
+    @test String(take!(io)) == "x = Int64[]"
+
+    # Round trip: writing an empty array and reading it back.
+    cliparray(Int[])
+    @test clipboard() == ""
+    @test cliparray() == Int[]
+end
+
 @testset "Kwargs with reading" begin
     """
     a,b
