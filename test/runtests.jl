@@ -2,8 +2,11 @@ using ClipData
 using Test
 using InteractiveUtils: clipboard
 using Tables
+using CSV
 
 const ≅ = isequal
+
+@testset "ClipData.jl" begin
 
 @testset "cliptable" begin
     """
@@ -64,6 +67,18 @@ end
     """ |> clipboard
 
     @test cliparray() == [1, 2, 3, 4]
+
+    """
+    1\t2\t3\t4
+    """ |> clipboard
+
+    @test cliparray() == [1, 2, 3, 4]
+
+    """
+    1,2,3,4
+    """ |> clipboard
+
+    @test cliparray() == [1, 2, 3, 4]
 end
 
 @testset "mwetable" begin
@@ -111,7 +126,7 @@ end
 X = \"\"\"
 1,2
 3,4
-\"\"\" |> IOBuffer |> CSV.File |> Tables.matrix"""
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix"""
 
     @test s == s_correct
 
@@ -145,7 +160,7 @@ x = \"\"\"
 2
 3
 4
-\"\"\" |> IOBuffer |> CSV.File |> Tables.matrix |> vec"""
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix |> vec"""
 
     @test s == s_correct
 
@@ -163,29 +178,94 @@ x = \"\"\"
     cliparray(x)
     mwearray(io)
     @test String(take!(io)) == s_correct
+end
 
+# Capture what an expression prints to stdout. The macros expand to the
+# no-`io` method, so there is no `io` argument to pass in. `redirect_stdout`
+# needs a real stream, hence the temp file rather than an `IOBuffer`.
+function capture_stdout(f)
+    mktemp() do path, io
+        redirect_stdout(f, io)
+        flush(io)
+        read(path, String)
+    end
+end
+
+# Run a generated MWE snippet in a fresh module and hand back the value it
+# binds, so we can check the code actually reproduces the original data.
+function eval_mwe(s, name)
+    m = Module()
+    Base.eval(m, :(using CSV, Tables))
+    # Return the binding from the same `include_string` that creates it, so the
+    # lookup does not run in an older world age than the assignment.
+    include_string(m, string(s, "\n", name))
 end
 
 @testset "@mwetable" begin
-    # Can't think of a way to test. Just check
-    # for errors.
-
     mytable = (a = [1, 2], b = [3, 4])
 
-    @mwetable mytable
+    # The macro's only job is splicing in the variable's name.
+    @test @macroexpand(@mwetable mytable) == :(mwetable(mytable, name = :mytable))
+    @test_throws MethodError @macroexpand(@mwetable (a = [1], b = [2]))
+
+    s = capture_stdout() do
+        @mwetable mytable
+    end
+
+    s_correct =
+"""
+mytable = \"\"\"
+a,b
+1,3
+2,4
+\"\"\" |> IOBuffer |> CSV.File"""
+
+    @test s == s_correct
+    @test s == mwetable(mytable; name = :mytable, returnstring = true)
+
+    # The generated code reproduces the original table.
+    @test eval_mwe(s, :mytable) |> Tables.columntable == mytable
 end
 
 @testset "@mwearray" begin
-    # Can't think of a way to test. Just check
-    # for errors.
-
     myarray = [1 2; 3 4]
-
-    @mwearray myarray
-
     myvector = [1, 2, 3, 4]
 
-    @mwearray myvector
+    @test @macroexpand(@mwearray myarray) == :(mwearray(myarray, name = :myarray))
+    @test @macroexpand(@mwearray myvector) == :(mwearray(myvector, name = :myvector))
+    @test_throws MethodError @macroexpand(@mwearray [1 2; 3 4])
+
+    s = capture_stdout() do
+        @mwearray myarray
+    end
+
+    s_correct =
+"""
+myarray = \"\"\"
+1,2
+3,4
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix"""
+
+    @test s == s_correct
+    @test s == mwearray(myarray; name = :myarray, returnstring = true)
+    @test eval_mwe(s, :myarray) == myarray
+
+    s = capture_stdout() do
+        @mwearray myvector
+    end
+
+    s_correct =
+"""
+myvector = \"\"\"
+1
+2
+3
+4
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix |> vec"""
+
+    @test s == s_correct
+    @test s == mwearray(myvector; name = :myvector, returnstring = true)
+    @test eval_mwe(s, :myvector) == myvector
 end
 
 @testset "Kwargs with reading" begin
@@ -220,6 +300,11 @@ end
     """ |> clipboard
     a = cliparray(; missingstring = "NA")
     @test a ≅  [1 2; 3 missing]
+
+    """
+    1 2 3 4
+    """ |> clipboard
+    @test cliparray(; delim = ',') == ["1 2 3 4"]
 end
 
 @testset "Kwargs with writing" begin
@@ -241,4 +326,286 @@ end
     @test clipboard() == "a\tb\n1\t-1\n-1\t4"
 end
 
+@testset "strings" begin
+    """
+    a,b
+    hello,world
+    foo,bar
+    """ |> clipboard
 
+    @test Tables.columntable(cliptable()) == (a = ["hello", "foo"], b = ["world", "bar"])
+
+    # Quoted fields containing the delimiter
+    """
+    a,b
+    "x,y",2
+    "p,q",4
+    """ |> clipboard
+
+    @test Tables.columntable(cliptable()) == (a = ["x,y", "p,q"], b = [2, 4])
+
+    # Same idea, but with a space delimiter
+    """
+    a b
+    "hello world" 2
+    "foo bar" 4
+    """ |> clipboard
+
+    t = cliptable(; delim = ' ') |> Tables.columntable
+    @test t == (a = ["hello world", "foo bar"], b = [2, 4])
+
+    # Escaped quotes inside a quoted field
+    """
+    a,b
+    "she said ""hi"" loudly",1
+    """ |> clipboard
+
+    @test Tables.columntable(cliptable()) == (a = ["she said \"hi\" loudly"], b = [1])
+
+    # Writing only escapes strings containing the delimiter actually in use
+    t = (a = ["x,y", "p"], b = [1, 2])
+
+    cliptable(t)
+    @test clipboard() == "a\tb\nx,y\t1\np\t2"
+
+    cliptable(t; delim = ',')
+    @test clipboard() == "a,b\n\"x,y\",1\np,2"
+
+    # ... so a tab-delimited write escapes embedded tabs instead
+    t = (a = ["x\ty"], b = [1])
+    cliptable(t)
+    @test clipboard() == "a\tb\n\"x\ty\"\t1"
+
+    # Embedded quotes and newlines are escaped as well
+    t = (a = ["say \"hi\"", "two\nlines"], b = [1, 2])
+    cliptable(t)
+    @test clipboard() == "a\tb\n\"say \"\"hi\"\"\"\t1\n\"two\nlines\"\t2"
+
+    # Round trip a table whose strings contain the delimiter
+    t = (a = ["x,y", "p,q"], b = [1, 2])
+    cliptable(t; delim = ',')
+    @test Tables.columntable(cliptable(; delim = ',')) == t
+
+    # Arrays of strings
+    """
+    a,b
+    c,d
+    """ |> clipboard
+
+    @test cliparray() == ["a" "b"; "c" "d"]
+
+    x = ["a,b", "c"]
+
+    cliparray(x)
+    @test clipboard() == "a,b\nc"
+
+    cliparray(x; delim = ',')
+    @test clipboard() == "\"a,b\"\nc"
+end
+
+@testset "mixed variables" begin
+    """
+    a,b,c,d
+    1,2.5,hello,true
+    3,4.0,world,false
+    """ |> clipboard
+
+    t = cliptable() |> Tables.columntable
+    @test t == (a = [1, 3], b = [2.5, 4.0], c = ["hello", "world"], d = [true, false])
+    @test eltype(t.a) <: Integer
+    @test eltype(t.b) <: AbstractFloat
+    @test eltype(t.c) <: AbstractString
+    @test eltype(t.d) == Bool
+
+    # Missing values mixed in with strings and numbers
+    """
+    a,b,c
+    1,x,2.5
+    ,y,
+    """ |> clipboard
+
+    t = cliptable() |> Tables.columntable
+    @test t ≅ (a = [1, missing], b = ["x", "y"], c = [2.5, missing])
+
+    # Mixed columns come back as a Matrix with a promoted eltype
+    """
+    1,a,2.5
+    2,b,3.5
+    """ |> clipboard
+
+    X = cliparray()
+    @test X isa Matrix
+    @test X == [1 "a" 2.5; 2 "b" 3.5]
+
+    # Writing a table with mixed column types
+    t = (a = [1, 2], b = ["x", "y"], c = [1.5, 2.5], d = [true, false])
+    cliptable(t)
+    @test clipboard() == "a\tb\tc\td\n1\tx\t1.5\ttrue\n2\ty\t2.5\tfalse"
+
+    # Writing a mixed array
+    X = [1 "a"; 2 "b"]
+    cliparray(X)
+    @test clipboard() == "1\ta\n2\tb"
+end
+
+@testset "mixed data within a column" begin
+    # Integers and floats in one column promote to Float64
+    """
+    a,b
+    1,2.5
+    2.5,3
+    """ |> clipboard
+
+    t = cliptable() |> Tables.columntable
+    @test t == (a = [1.0, 2.5], b = [2.5, 3.0])
+    @test eltype(t.a) <: AbstractFloat
+    @test eltype(t.b) <: AbstractFloat
+
+    # A non-numeric value later in the column forces the whole column to String
+    """
+    a
+    1
+    2
+    3
+    hello
+    """ |> clipboard
+
+    t = cliptable() |> Tables.columntable
+    @test t == (a = ["1", "2", "3", "hello"],)
+    @test eltype(t.a) <: AbstractString
+
+    # ... and the same holds when the non-numeric value comes first
+    """
+    a
+    hello
+    1
+    2
+    3
+    """ |> clipboard
+
+    @test Tables.columntable(cliptable()) == (a = ["hello", "1", "2", "3"],)
+
+    # Missing values inside an otherwise mixed column
+    """
+    a,b
+    1,x
+    ,y
+    hello,z
+    """ |> clipboard
+
+    t = cliptable() |> Tables.columntable
+    @test t ≅ (a = ["1", missing, "hello"], b = ["x", "y", "z"])
+
+    # `types` overrides the promotion and keeps everything as strings
+    """
+    a,b
+    1,2
+    3,4
+    """ |> clipboard
+
+    t = cliptable(; types = String) |> Tables.columntable
+    @test t == (a = ["1", "3"], b = ["2", "4"])
+
+    # A mixed column read as an array
+    """
+    1
+    2.5
+    hello
+    """ |> clipboard
+
+    @test cliparray() == ["1", "2.5", "hello"]
+
+    """
+    1,x
+    2.5,y
+    hello,z
+    """ |> clipboard
+
+    @test cliparray() == ["1" "x"; "2.5" "y"; "hello" "z"]
+
+    # Writing a mixed Julia column
+    t = (a = Any[1, "two", 3.5],)
+    cliptable(t)
+    @test clipboard() == "a\n1\ntwo\n3.5"
+
+    # ... including one whose string element contains the delimiter
+    t = (a = Any[1, "x,y", 2.5],)
+    cliptable(t; delim = ',')
+    @test clipboard() == "a\n1\n\"x,y\"\n2.5"
+
+    # ... and one containing missing
+    t = (a = Any[1, missing, "x"],)
+    cliptable(t; missingstring = "NA")
+    @test clipboard() == "a\n1\nNA\nx"
+
+    # A mixed column survives a round trip through an MWE
+    """
+    a,b
+    1,x
+    hello,2.5
+    """ |> clipboard
+
+    s_correct =
+"""
+df = \"\"\"
+a,b
+1,x
+hello,2.5
+\"\"\" |> IOBuffer |> CSV.File"""
+
+    @test mwetable(; returnstring = true) == s_correct
+end
+
+@testset "mwe with strings and mixed types" begin
+    t = (a = ["x,y", "p"], b = [1, 2])
+
+    s_correct =
+"""
+df = \"\"\"
+a,b
+\"x,y\",1
+p,2
+\"\"\" |> IOBuffer |> CSV.File"""
+
+    @test mwetable(t; returnstring = true) == s_correct
+
+    # Same table, but round tripped through the clipboard first
+    cliptable(t; delim = ',')
+    @test mwetable(; returnstring = true) == s_correct
+
+    t = (a = [1, 2], b = ["x", "y"], c = [1.5, 2.5])
+
+    s_correct =
+"""
+df = \"\"\"
+a,b,c
+1,x,1.5
+2,y,2.5
+\"\"\" |> IOBuffer |> CSV.File"""
+
+    @test mwetable(t; returnstring = true) == s_correct
+
+    x = ["a,b", "c"]
+
+    s_correct =
+"""
+x = \"\"\"
+\"a,b\"
+c
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix |> vec"""
+
+    @test mwearray(x; returnstring = true) == s_correct
+
+    X = [1 "a"; 2 "b"]
+
+    s_correct =
+"""
+X = \"\"\"
+1,a
+2,b
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix"""
+
+    @test mwearray(X; returnstring = true) == s_correct
+end
+
+end

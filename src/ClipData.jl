@@ -308,7 +308,7 @@ julia> mwearray()
 X = \"\"\"
 1,2
 3,4
-\"\"\" |> IOBuffer |> CSV.File |> Tables.matrix
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix
 ```
 """
 function mwearray(io::IO; returnstring=false, name=nothing)
@@ -340,7 +340,7 @@ julia> mwearray(X)
 X = \"\"\"
 1,2
 3,4
-\"\"\" |> IOBuffer |> CSV.File |> Tables.matrix
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix
 ```
 """
 function mwearray(io::IO, t::AbstractMatrix; returnstring=false, name=:X)
@@ -356,7 +356,7 @@ $name = \"\"\"
     print(main_io, String(take!(array_io)))
 
     end_str = """
-\"\"\" |> IOBuffer |> CSV.File |> Tables.matrix"""
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix"""
     print(main_io, end_str)
     s = String(take!(main_io))
 
@@ -386,7 +386,7 @@ x = \"\"\"
 2
 3
 4
-\"\"\" |> IOBuffer |> CSV.File |> Tables.matrix |> vec
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix |> vec
 ```
 """
 function mwearray(io::IO, t::AbstractVector; returnstring=false, name=:x)
@@ -404,7 +404,7 @@ $name = \"\"\"
     print(main_io, String(take!(array_io)))
 
     end_str = """
-\"\"\" |> IOBuffer |> CSV.File |> Tables.matrix |> vec"""
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix |> vec"""
     print(main_io, end_str)
     s = String(take!(main_io))
 
@@ -443,7 +443,7 @@ julia> @mwearray my_special_matrix
 my_special_matrix = \"\"\"
 1,2
 3,4
-\"\"\" |> IOBuffer |> CSV.File |> Tables.matrix
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix
 ```
 """
 macro mwearray(t)
