@@ -287,14 +287,17 @@ macro mwetable(t)
 end
 
 """
-    mwearray([io::IO=stdout]; name=:X)
+    mwearray([io::IO=stdout]; name=nothing)
 
 Create a Minimum Working Example (MWE) from
 the clipboard to create an array. `mwearray`
 returns the a multi-line string with the
 code necessary to read the string stored in
 clipboard as a `Vector` or `Matrix`. Prints to `io`,
-which is by default `stdout`.
+which is by default `stdout`. The object is assigned
+the name given by `name`, which defaults to `:X` when
+the clipboard holds a `Matrix` and `:x` when it holds
+a `Vector`.
 
 # Examples
 
@@ -313,7 +316,7 @@ X = \"\"\"
 """
 function mwearray(io::IO; returnstring=false, name=nothing)
     t = cliparray()
-    name= t isa AbstractVector ? :x : :X
+    name = something(name, t isa AbstractVector ? :x : :X)
     mwearray(io, t, returnstring=returnstring, name=name)
 end
 

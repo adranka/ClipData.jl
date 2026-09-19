@@ -178,6 +178,38 @@ x = \"\"\"
     cliparray(x)
     mwearray(io)
     @test String(take!(io)) == s_correct
+
+    # `name` is honored when reading from the clipboard, and its default
+    # follows the shape of the data.
+    s = mwearray(; name = :myvec, returnstring = true)
+
+    s_correct =
+"""
+myvec = \"\"\"
+1
+2
+3
+4
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix |> vec"""
+
+    @test s == s_correct
+
+    io = IOBuffer()
+    mwearray(io; name = :myvec)
+    @test String(take!(io)) == s_correct
+
+    cliparray([1 2; 3 4])
+    s = mwearray(; name = :mymat, returnstring = true)
+
+    s_correct =
+"""
+mymat = \"\"\"
+1,2
+3,4
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix"""
+
+    @test s == s_correct
+    @test startswith(mwearray(; returnstring = true), "X = ")
 end
 
 # Capture what an expression prints to stdout. The macros expand to the
