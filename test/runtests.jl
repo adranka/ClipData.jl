@@ -236,9 +236,11 @@ end
 @testset "@mwetable" begin
     mytable = (a = [1, 2], b = [3, 4])
 
-    # The macro's only job is splicing in the variable's name.
-    @test @macroexpand(@mwetable mytable) == :(mwetable(mytable, name = :mytable))
-    @test_throws MethodError @macroexpand(@mwetable (a = [1], b = [2]))
+    # The macro's only job is splicing in the variable's name. `mwetable`
+    # resolves in ClipData, not in the caller's scope.
+    @test @macroexpand(@mwetable mytable) ==
+        :($(GlobalRef(ClipData, :mwetable))(mytable, name = :mytable))
+    @test_throws ArgumentError @macroexpand(@mwetable (a = [1], b = [2]))
 
     s = capture_stdout() do
         @mwetable mytable
@@ -263,9 +265,19 @@ end
     myarray = [1 2; 3 4]
     myvector = [1, 2, 3, 4]
 
-    @test @macroexpand(@mwearray myarray) == :(mwearray(myarray, name = :myarray))
-    @test @macroexpand(@mwearray myvector) == :(mwearray(myvector, name = :myvector))
-    @test_throws MethodError @macroexpand(@mwearray [1 2; 3 4])
+    @test @macroexpand(@mwearray myarray) ==
+        :($(GlobalRef(ClipData, :mwearray))(myarray, name = :myarray))
+    @test @macroexpand(@mwearray myvector) ==
+        :($(GlobalRef(ClipData, :mwearray))(myvector, name = :myvector))
+    @test_throws ArgumentError @macroexpand(@mwearray [1 2; 3 4])
+
+    # The error points at the function form rather than naming a private helper.
+    e = try
+        @macroexpand(@mwearray [1 2; 3 4])
+    catch err
+        err
+    end
+    @test occursin("@mwearray expects the name of a variable", sprint(showerror, e))
 
     s = capture_stdout() do
         @mwearray myarray
@@ -298,6 +310,39 @@ myvector = \"\"\"
     @test s == s_correct
     @test s == mwearray(myvector; name = :myvector, returnstring = true)
     @test eval_mwe(s, :myvector) == myvector
+end
+
+# The macros expand to a call on ClipData's own function, so they work even when
+# that function is not reachable from the caller's scope.
+@testset "macro scope" begin
+    expected_array = mwearray([1 2; 3 4]; name = :myarray, returnstring = true)
+    expected_table = mwetable((a = [1, 2],); name = :mytable, returnstring = true)
+
+    # Only the macros are imported; `mwearray`/`mwetable` are not in scope.
+    m = Module()
+    Base.eval(m, :(import ClipData: @mwearray, @mwetable))
+    Base.eval(m, :(myarray = [1 2; 3 4]))
+    Base.eval(m, :(mytable = (a = [1, 2],)))
+
+    @test capture_stdout() do
+        Base.eval(m, :(@mwearray myarray))
+    end == expected_array
+
+    @test capture_stdout() do
+        Base.eval(m, :(@mwetable mytable))
+    end == expected_table
+
+    # A local binding shadowing the function name must not be called instead.
+    m = Module()
+    Base.eval(m, :(using ClipData))
+    Base.eval(m, :(function shadowed(mwearray)
+        myarray = [1 2; 3 4]
+        @mwearray myarray
+    end))
+
+    @test capture_stdout() do
+        Base.eval(m, :(shadowed("not a function")))
+    end == expected_array
 end
 
 @testset "Kwargs with reading" begin

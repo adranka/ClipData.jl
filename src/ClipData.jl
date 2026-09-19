@@ -259,7 +259,14 @@ mwetable(t; kwargs...) = mwetable(stdout, t; kwargs...)
 
 function mwetable_helper(t::Symbol)
     t_name = QuoteNode(t)
-    :(mwetable($t, name = $t_name))
+    # `mwetable` is left unescaped so it resolves in this module rather than in
+    # the caller's scope; only the user's variable is escaped.
+    :(mwetable($(esc(t)), name = $t_name))
+end
+
+function mwetable_helper(t)
+    throw(ArgumentError("@mwetable expects the name of a variable, got `$t`. " *
+                        "Use `mwetable($t)` instead."))
 end
 
 """
@@ -290,7 +297,7 @@ a,b
 ```
 """
 macro mwetable(t)
-    esc(mwetable_helper(t))
+    mwetable_helper(t)
 end
 
 """
@@ -430,7 +437,14 @@ mwearray(t::Union{AbstractVector, AbstractMatrix}; kwargs...) = mwearray(stdout,
 
 function mwearray_helper(t::Symbol)
     t_name = QuoteNode(t)
-    :(mwearray($t, name=$t_name))
+    # `mwearray` is left unescaped so it resolves in this module rather than in
+    # the caller's scope; only the user's variable is escaped.
+    :(mwearray($(esc(t)), name=$t_name))
+end
+
+function mwearray_helper(t)
+    throw(ArgumentError("@mwearray expects the name of a variable, got `$t`. " *
+                        "Use `mwearray($t)` instead."))
 end
 
 """
@@ -457,7 +471,7 @@ my_special_matrix = \"\"\"
 ```
 """
 macro mwearray(t)
-    esc(mwearray_helper(t))
+    mwearray_helper(t)
 end
 
 end
