@@ -843,6 +843,46 @@ X = \"\"\"
     @test mwearray(X; returnstring = true) == s_correct
 end
 
+@testset "mwe escaping" begin
+    # Handle backslashes `\`
+    t = (a = ["C:\\new\\temp", "x"],)
+    @test Tables.columntable(eval_mwe(mwetable(t; returnstring = true), :df)) == t
+
+    # Handle interpolation `$`
+    t = (a = ["\$CSV", "\$(1 + 1)"],)
+    @test Tables.columntable(eval_mwe(mwetable(t; returnstring = true), :df)) == t
+
+    # Handle quotes `"`
+    t = (a = ["say \"hi\"", "ok"],)
+    @test Tables.columntable(eval_mwe(mwetable(t; returnstring = true), :df)) == t
+
+    # All three, through `mwearray`'s vector and matrix methods.
+    x = ["C:\\new", "\$CSV", "say \"hi\""]
+    @test eval_mwe(mwearray(x; returnstring = true), :x) == x
+
+    X = ["C:\\n" "\$CSV"; "say \"hi\"" "z"]
+    @test eval_mwe(mwearray(X; returnstring = true), :X) == X
+
+    # ... and through the macros, which share the same code path.
+    myescaped = (a = ["C:\\new", "\$CSV", "say \"hi\""],)
+    s = capture_stdout() do
+        @mwetable myescaped
+    end
+    @test Tables.columntable(eval_mwe(s, :myescaped)) == myescaped
+
+    @test occursin("\\\\", mwetable((a = ["C:\\new"],); returnstring = true))
+    @test !occursin('\\', mwetable((a = [1, 2], b = [3, 4]); returnstring = true))
+    @test !occursin('\\', mwearray([1, 2]; returnstring = true))
+    # A field merely containing the delimiter is quoted by CSV, not escaped by us.
+    @test mwetable((a = ["x,y", "p"], b = [1, 2]); returnstring = true) ==
+"""
+df = \"\"\"
+a,b
+\"x,y\",1
+p,2
+\"\"\" |> IOBuffer |> CSV.File"""
+end
+
 @testset "name validation" begin
     # `name` is interpolated straight into the generated code, so a name that is
     # not an identifier would silently produce code that does not parse.

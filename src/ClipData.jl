@@ -32,6 +32,15 @@ function checkname(name)
     return name
 end
 
+function escapepayload(s)
+    if occursin('\\', s) || occursin('$', s) || occursin("\"\"\"", s)
+        s = replace(s, "\\" => "\\\\")
+        s = replace(s, "\$" => "\\\$")
+        s = replace(s, "\"" => "\\\"")
+    end
+    return s
+end
+
 # `CSV.write` terminates the last row with `newline`; the clipboard should not
 # carry that trailing separator.
 function chopnewline(s, newline)
@@ -259,8 +268,8 @@ $name = \"\"\"
 """
     print(main_io, start_str)
 
-    CSV.write(table_io, t;)
-    print(main_io, String(take!(table_io)))
+    CSV.write(table_io, t)
+    print(main_io, escapepayload(String(take!(table_io))))
 
     end_str = """
 \"\"\" |> IOBuffer |> CSV.File"""
@@ -402,7 +411,7 @@ $name = \"\"\"
     print(main_io, start_str)
 
     CSV.write(array_io, Tables.table(t); header=false)
-    print(main_io, String(take!(array_io)))
+    print(main_io, escapepayload(String(take!(array_io))))
 
     end_str = """
 \"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix"""
@@ -462,7 +471,7 @@ $name = \"\"\"
     print(main_io, start_str)
 
     CSV.write(array_io, Tables.table(t); header=false)
-    print(main_io, String(take!(array_io)))
+    print(main_io, escapepayload(String(take!(array_io))))
 
     end_str = """
 \"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix |> vec"""
