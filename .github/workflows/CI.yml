@@ -10,8 +10,9 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.3'
-          - '1.6'
+          - 'pre'
+          - 'lts'
+          - '1'
         os:
           - macOS-latest
           - windows-latest
