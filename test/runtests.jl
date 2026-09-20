@@ -460,6 +460,92 @@ end
     @test cliparray() == [1, 2, 3]
 end
 
+@testset "Kwargs with mwe" begin
+    # `mwetable()`/`mwearray()` forward keyword arguments to the clipboard read,
+    # so data that needs them can be turned into an MWE at all.
+    "a;b\n1;2\n3;4" |> clipboard
+
+    s = mwetable(; delim = ';', returnstring = true)
+
+    s_correct =
+"""
+df = \"\"\"
+a,b
+1,2
+3,4
+\"\"\" |> IOBuffer |> CSV.File"""
+
+    @test s == s_correct
+    @test eval_mwe(s, :df) |> Tables.columntable == (a = [1, 3], b = [2, 4])
+
+    "1;2\n3;4" |> clipboard
+
+    s = mwearray(; delim = ';', returnstring = true)
+
+    s_correct =
+"""
+X = \"\"\"
+1,2
+3,4
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix"""
+
+    @test s == s_correct
+    @test eval_mwe(s, :X) == [1 2; 3 4]
+
+    # The MWE is always written in the default comma form, so a `missingstring`
+    # used on the way in is canonicalised on the way out.
+    "a,b\n1,NA\n3,4" |> clipboard
+
+    s = mwetable(; missingstring = "NA", returnstring = true)
+    @test s ==
+"""
+df = \"\"\"
+a,b
+1,
+3,4
+\"\"\" |> IOBuffer |> CSV.File"""
+
+    @test eval_mwe(s, :df) |> Tables.columntable ≅ (a = [1, 3], b = [missing, 4])
+
+    # The example from the README.
+    "my col,other col\n1,2" |> clipboard
+    @test mwetable(; normalizenames = true, returnstring = true) ==
+"""
+df = \"\"\"
+my_col,other_col
+1,2
+\"\"\" |> IOBuffer |> CSV.File"""
+
+    # Read kwargs compose with `name` and `io`.
+    "a;b\n1;2" |> clipboard
+
+    s_correct =
+"""
+mydf = \"\"\"
+a,b
+1,2
+\"\"\" |> IOBuffer |> CSV.File"""
+
+    @test mwetable(; delim = ';', name = "mydf", returnstring = true) == s_correct
+
+    io = IOBuffer()
+    mwetable(io; delim = ';', name = "mydf")
+    @test String(take!(io)) == s_correct
+
+    "1;2" |> clipboard
+    @test mwearray(; delim = ';', name = :myvec, returnstring = true) ==
+"""
+myvec = \"\"\"
+1
+2
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix |> vec"""
+
+    # Write kwargs are deliberately not forwarded: the generated snippet has no
+    # way to reflect them, so a MethodError beats a silently wrong MWE.
+    @test_throws MethodError mwetable((a = [1, missing],); missingstring = "NA")
+    @test_throws MethodError mwearray([1, 2]; delim = ';')
+end
+
 @testset "strings" begin
     """
     a,b

@@ -183,7 +183,7 @@ function cliparray(t::AbstractVecOrMat; returnstring = false, delim='\t',
 end
 
 """
-    mwetable([io::IO=stdout]; name="df")
+    mwetable([io::IO=stdout]; name="df", kwargs...)
 
 Create a Minimum Working Example (MWE) using
 the clipboard. `tablmwe` prints out a multi-line
@@ -211,8 +211,8 @@ a,b
 ```
 
 """
-function mwetable(io::IO; returnstring=false, name="df")
-    t = cliptable()
+function mwetable(io::IO; returnstring=false, name="df", kwargs...)
+    t = cliptable(; kwargs...)
     mwetable(io, t, returnstring=returnstring, name=name)
 end
 
@@ -312,7 +312,7 @@ macro mwetable(t)
 end
 
 """
-    mwearray([io::IO=stdout]; name=nothing)
+    mwearray([io::IO=stdout]; name=nothing, kwargs...)
 
 Create a Minimum Working Example (MWE) from
 the clipboard to create an array. `mwearray`
@@ -339,8 +339,8 @@ X = \"\"\"
 \"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix
 ```
 """
-function mwearray(io::IO; returnstring=false, name=nothing)
-    t = cliparray()
+function mwearray(io::IO; returnstring=false, name=nothing, kwargs...)
+    t = cliparray(; kwargs...)
     name = something(name, t isa AbstractVector ? :x : :X)
     mwearray(io, t, returnstring=returnstring, name=name)
 end
