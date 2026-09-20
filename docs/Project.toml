@@ -1,2 +1,9 @@
 [deps]
+ClipData = "39db22c5-8506-4ef9-b8dc-9d8ef5f2b71d"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+
+[sources]
+ClipData = {path = ".."}
+
+[compat]
+Documenter = "1"
