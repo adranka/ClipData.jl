@@ -3,6 +3,8 @@ using Test
 using InteractiveUtils: clipboard
 using Tables
 using CSV
+using Aqua
+using Documenter
 
 const ≅ = isequal
 
@@ -832,6 +834,23 @@ X = \"\"\"
 \"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix"""
 
     @test mwearray(X; returnstring = true) == s_correct
+end
+
+@testset "docstrings" begin
+    # The doctests drive the real clipboard, so they need `clipboard` in scope
+    # alongside the package itself. `docs/make.jl` skips them for that reason:
+    # the docs are built on a headless machine with no clipboard.
+    DocMeta.setdocmeta!(
+        ClipData,
+        :DocTestSetup,
+        :(using ClipData, Tables; using InteractiveUtils: clipboard);
+        recursive = true)
+
+    doctest(ClipData; manual = false)
+end
+
+@testset "Aqua" begin
+    Aqua.test_all(ClipData)
 end
 
 end

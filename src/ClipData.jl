@@ -38,7 +38,7 @@ constructor.
 
 ## Examples
 
-```julia-repl
+```jldoctest
 julia> # Send string to the clipboard
        \"\"\"
        a,b
@@ -66,7 +66,7 @@ Otherwise it returns a `Matrix`.
 
 # Examples
 
-```julia-repl
+```jldoctest
 julia> # Send string to clipboard
        \"\"\"
        1 2
@@ -118,15 +118,11 @@ also return the string sent to the clipboard.
 
 # Example
 
-```julia-repl
+```jldoctest
 julia> t = (a = [1, 2, 3], b = [100, 200, 300])
 (a = [1, 2, 3], b = [100, 200, 300])
 
 julia> cliptable(t)
-a   b
-1   100
-2   200
-3   300
 ```
 """
 function cliptable(t; returnstring = false, delim = '\t', newline = '\n', kwargs...)
@@ -153,7 +149,7 @@ the string sent to the clipboard.
 
 # Examples
 
-```julia-repl
+```jldoctest
 julia> X = [1 2; 3 4]
 2×2 Matrix{Int64}:
  1  2
@@ -193,7 +189,7 @@ as a `String` if `returnstring=true`.
 
 # Examples
 
-```julia-repl
+```jldoctest
 julia> \"\"\"
        a b
        1 2
@@ -232,7 +228,7 @@ as a `String` if `returnstring=true`.
 
 # Examples
 
-```julia-repl
+```jldoctest
 julia> t = (a = [1, 2, 3], b = [100, 200, 300])
 (a = [1, 2, 3], b = [100, 200, 300])
 
@@ -294,7 +290,7 @@ to `stdout`.
 
 # Examples
 
-```julia-repl
+```jldoctest
 julia> my_special_table = (a = [1, 2, 3], b = [100, 200, 300])
 (a = [1, 2, 3], b = [100, 200, 300])
 
@@ -327,7 +323,7 @@ a `Vector`.
 
 # Examples
 
-```julia-repl
+```jldoctest
 julia> \"\"\"
        1 2
        3 4
@@ -360,7 +356,7 @@ if `returnstring=true`.
 
 # Examples
 
-```julia-repl
+```jldoctest
 julia> X = [1 2; 3 4]
 2×2 Matrix{Int64}:
  1  2
@@ -409,7 +405,7 @@ if `returnstring=true`.
 
 # Example
 
-```julia-repl
+```jldoctest
 julia> x = [1, 2, 3, 4]
 4-element Vector{Int64}:
  1
@@ -476,7 +472,7 @@ to `stdout`.
 
 # Examples
 
-```julia-repl
+```jldoctest
 julia> my_special_matrix = [1 2; 3 4]
 2×2 Matrix{Int64}:
  1  2
