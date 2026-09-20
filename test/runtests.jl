@@ -241,6 +241,17 @@ function eval_mwe(s, name)
     include_string(m, string(s, "\n", name))
 end
 
+# Julia 1.6 wraps an error thrown during macro expansion in a `LoadError`, while
+# later versions rethrow it untouched. Hand back the error the macro itself threw.
+function expansion_error(ex)
+    try
+        macroexpand(@__MODULE__, ex)
+        nothing
+    catch err
+        err isa LoadError ? err.error : err
+    end
+end
+
 @testset "@mwetable" begin
     mytable = (a = [1, 2], b = [3, 4])
 
@@ -248,7 +259,7 @@ end
     # resolves in ClipData, not in the caller's scope.
     @test @macroexpand(@mwetable mytable) ==
         :($(GlobalRef(ClipData, :mwetable))(mytable, name = :mytable))
-    @test_throws ArgumentError @macroexpand(@mwetable (a = [1], b = [2]))
+    @test expansion_error(:(@mwetable (a = [1], b = [2]))) isa ArgumentError
 
     s = capture_stdout() do
         @mwetable mytable
@@ -277,14 +288,10 @@ end
         :($(GlobalRef(ClipData, :mwearray))(myarray, name = :myarray))
     @test @macroexpand(@mwearray myvector) ==
         :($(GlobalRef(ClipData, :mwearray))(myvector, name = :myvector))
-    @test_throws ArgumentError @macroexpand(@mwearray [1 2; 3 4])
+    @test expansion_error(:(@mwearray [1 2; 3 4])) isa ArgumentError
 
     # The error points at the function form rather than naming a private helper.
-    e = try
-        @macroexpand(@mwearray [1 2; 3 4])
-    catch err
-        err
-    end
+    e = expansion_error(:(@mwearray [1 2; 3 4]))
     @test occursin("@mwearray expects the name of a variable", sprint(showerror, e))
 
     s = capture_stdout() do
