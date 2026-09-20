@@ -79,6 +79,12 @@ end
     """ |> clipboard
 
     @test cliparray() == [1, 2, 3, 4]
+
+    """
+    5
+    """ |> clipboard
+
+    @test cliparray() == [5]
 end
 
 @testset "mwetable" begin

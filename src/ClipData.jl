@@ -61,8 +61,8 @@ end
 Make a `Vector` or `Matrix` from the clipboard.
 Auto-detects delimiters, and all keyword arguments are passed
 directly to a `CSV.File` constructor. If the returned `CSV.File`
-has one column, `cliparray` returns a `Vector`. Otherwise, it returns
-a `Matrix`.
+has one row or one column, `cliparray` returns a `Vector`. 
+Otherwise it returns a `Matrix`.
 
 # Examples
 
