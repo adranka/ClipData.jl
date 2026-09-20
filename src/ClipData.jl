@@ -17,6 +17,21 @@ export cliptable, cliparray, mwetable, mwearray, @mwetable, @mwearray
     end
 end
 
+function clipstring(s, returnstring)
+    clipboard(s)
+    if returnstring == true
+        return String(s)
+    else
+        return nothing
+    end
+end
+
+function checkname(name)
+    Base.isidentifier(name) || throw(ArgumentError(
+        "`name` must be a valid Julia identifier, got `$name`."))
+    return name
+end
+
 # `CSV.write` terminates the last row with `newline`; the clipboard should not
 # carry that trailing separator.
 function chopnewline(s, newline)
@@ -129,13 +144,7 @@ function cliptable(t; returnstring = false, delim = '\t', newline = '\n', kwargs
     io = IOBuffer()
     CSV.write(io, t; delim = delim, newline = newline, kwargs...)
     s = chopnewline(String(take!(io)), newline)
-    clipboard(s)
-
-    if returnstring == true
-      return s
-    else
-      return nothing
-    end
+    return clipstring(s, returnstring)
 end
 
 """
@@ -166,26 +175,25 @@ function cliparray(t::AbstractVecOrMat; returnstring = false, delim='\t',
     io = IOBuffer()
     CSV.write(io, Tables.table(t); delim=delim, header=header, newline=newline, kwargs...)
     s = chopnewline(String(take!(io)), newline)
-    clipboard(s)
-
-    if returnstring == true
-      return s
-    else
-      return nothing
-    end
+    return clipstring(s, returnstring)
 end
 
 """
-    mwetable([io::IO=stdout]; returnstring=false, name="df", kwargs...)
+    mwetable([io::IO=stdout]; returnstring=false, name=:df, kwargs...)
 
 Create a Minimum Working Example (MWE) using
 the clipboard. `mwetable` prints out a multi-line
 comma-separated string and provides the necessary
 code to read that string using `CSV.File`.
 The object is assigned the name given by
-`name` (default `"df"`). Prints to `io`,
+`name` (default `:df`). Prints to `io`,
 which is by default `stdout`, or returns the code
 as a `String` if `returnstring=true`.
+
+Remaining keyword arguments are forwarded to [`cliptable`](@ref)
+to parse the clipboard, so data needing e.g. `delim` or
+`missingstring` can still be turned into an MWE. The generated
+code is always written in the default comma-separated form.
 
 # Examples
 
@@ -205,7 +213,7 @@ a,b
 ```
 
 """
-function mwetable(io::IO; returnstring=false, name="df", kwargs...)
+function mwetable(io::IO; returnstring=false, name=:df, kwargs...)
     t = cliptable(; kwargs...)
     mwetable(io, t, returnstring=returnstring, name=name)
 end
@@ -214,7 +222,7 @@ mwetable(; kwargs...) = mwetable(stdout; kwargs...)
 
 
 """
-    mwetable([io::IO=stdout], t; returnstring=false, name="df")
+    mwetable([io::IO=stdout], t; returnstring=false, name=:df)
 
 Create a Minimum Working Example (MWE) from
 an existing Tables.jl-compatible object.
@@ -222,7 +230,7 @@ an existing Tables.jl-compatible object.
 comma-separated string and provides the necessary
 code to read that string using `CSV.File`.
 The object is assigned the name given by
-`name` (default `"df"`). Prints to `io`,
+`name` (default `:df`). Prints to `io`,
 which is by default `stdout`, or returns the code
 as a `String` if `returnstring=true`.
 
@@ -241,7 +249,8 @@ a,b
 \"\"\" |> IOBuffer |> CSV.File
 ```
 """
-function mwetable(io::IO, t; returnstring=false, name="df")
+function mwetable(io::IO, t; returnstring=false, name=:df)
+    checkname(name)
     main_io = IOBuffer()
     table_io = IOBuffer()
 
@@ -317,9 +326,14 @@ and provides the necessary code to read that string
 back as a `Vector` or `Matrix`. Prints to `io`,
 which is by default `stdout`, or returns the code
 as a `String` if `returnstring=true`. The object is assigned
-the name given by `name`, which defaults to `:X` when
-the clipboard holds a `Matrix` and `:x` when it holds
-a `Vector`.
+the name given by `name`, which must be a valid Julia
+identifier and defaults to `:X` when the clipboard holds a
+`Matrix` and `:x` when it holds a `Vector`.
+
+Remaining keyword arguments are forwarded to [`cliparray`](@ref)
+to parse the clipboard. Note that `cliparray` collapses a single
+row to a `Vector`, so a one-row clipboard produces a single-column
+MWE; pass the data through [`mwetable`](@ref) to keep the layout.
 
 # Examples
 
@@ -352,7 +366,11 @@ a `Matrix`. `mwearray` prints out a multi-line
 comma-separated string and provides the necessary
 code to recreate `t`. Prints to `io`, which is by
 default `stdout`, or returns the code as a `String`
-if `returnstring=true`.
+if `returnstring=true`. `name` must be a valid Julia
+identifier.
+
+This method takes no `CSV.write` keyword arguments: the
+generated code is always the default comma-separated form.
 
 # Examples
 
@@ -370,6 +388,7 @@ X = \"\"\"
 ```
 """
 function mwearray(io::IO, t::AbstractMatrix; returnstring=false, name=:X)
+    checkname(name)
     if isempty(t)
         return mwestring(io, "$name = Matrix{$(eltype(t))}(undef, $(size(t, 1)), $(size(t, 2)))", returnstring)
     end
@@ -401,7 +420,11 @@ a `Vector`. `mwearray` prints out a multi-line
 comma-separated string and provides the necessary
 code to recreate `t`. Prints to `io`, which is by
 default `stdout`, or returns the code as a `String`
-if `returnstring=true`.
+if `returnstring=true`. `name` must be a valid Julia
+identifier.
+
+This method takes no `CSV.write` keyword arguments: the
+generated code is always the default comma-separated form.
 
 # Example
 
@@ -423,6 +446,7 @@ x = \"\"\"
 ```
 """
 function mwearray(io::IO, t::AbstractVector; returnstring=false, name=:x)
+    checkname(name)
     if isempty(t)
         return mwestring(io, "$name = $(eltype(t))[]", returnstring)
     end

@@ -843,6 +843,31 @@ X = \"\"\"
     @test mwearray(X; returnstring = true) == s_correct
 end
 
+@testset "name validation" begin
+    # `name` is interpolated straight into the generated code, so a name that is
+    # not an identifier would silently produce code that does not parse.
+    t = (a = [1, 2],)
+    @test_throws ArgumentError mwetable(t; name = "my df")
+    @test_throws ArgumentError mwearray([1, 2]; name = "3x")
+    @test_throws ArgumentError mwearray([1 2; 3 4]; name = "a-b")
+    # ... including on the empty short-circuit, which builds a literal instead
+    @test_throws ArgumentError mwearray(Int[]; name = "my vec")
+    @test_throws ArgumentError mwearray(Matrix{Int}(undef, 0, 2); name = "my mat")
+
+    clipboard("a,b\n1,2")
+    @test_throws ArgumentError mwetable(; name = "my df")
+    clipboard("1,2")
+    @test_throws ArgumentError mwearray(; name = "my vec")
+
+    e = try mwetable(t; name = "my df") catch err; err end
+    @test occursin("must be a valid Julia identifier", sprint(showerror, e))
+
+    # Both `Symbol` and `String` names are accepted when they are identifiers.
+    @test mwetable(t; name = :ok, returnstring = true) ==
+          mwetable(t; name = "ok", returnstring = true)
+    @test startswith(mwetable(t; name = :ok, returnstring = true), "ok = ")
+end
+
 @testset "docstrings" begin
     # The doctests drive the real clipboard, so they need `clipboard` in scope
     # alongside the package itself. `docs/make.jl` skips them for that reason:
