@@ -989,6 +989,26 @@ end
     @test mwetable(t; name = :ok, returnstring = true) ==
           mwetable(t; name = "ok", returnstring = true)
     @test startswith(mwetable(t; name = :ok, returnstring = true), "ok = ")
+
+    @test_throws ArgumentError mwetable(t; name = :end)
+    @test_throws ArgumentError mwetable(t; name = "function")
+    @test_throws ArgumentError mwearray([1, 2]; name = :if)
+    @test_throws ArgumentError mwearray([1 2; 3 4]; name = :struct)
+    @test_throws ArgumentError mwearray(Int[]; name = :global)
+    clipboard("a,b\n1,2")
+    @test_throws ArgumentError mwetable(; name = :end)
+
+    # A `name` that is neither a `Symbol` nor a `String` is rejected the same
+    # way, rather than throwing a `MethodError` out of `isidentifier`.
+    @test_throws ArgumentError mwetable(t; name = 1)
+    @test_throws ArgumentError mwearray([1, 2]; name = true)
+
+    # Every accepted name produces code that parses and runs.
+    for n in (:df, :x1, :α, :my_table2)
+        s = mwetable(t; name = n, returnstring = true)
+        @test startswith(s, string(n, " = "))
+        @test Tables.columntable(eval_mwe(s, n)) == t
+    end
 end
 
 @testset "docstrings" begin

@@ -26,8 +26,12 @@ function clipstring(s, returnstring)
     end
 end
 
+isreserved(name) = !(Meta.parse(String(name); raise = false) isa Symbol)
+
 function checkname(name)
-    Base.isidentifier(name) || throw(ArgumentError(
+    ok = name isa Union{Symbol, AbstractString} &&
+         Base.isidentifier(name) && !isreserved(name)
+    ok || throw(ArgumentError(
         "`name` must be a valid Julia identifier, got `$name`."))
     return name
 end
