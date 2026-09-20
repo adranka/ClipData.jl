@@ -883,6 +883,89 @@ p,2
 \"\"\" |> IOBuffer |> CSV.File"""
 end
 
+@testset "missing in one-column data" begin
+    # Check that a single column that has `missing` is properly handled`
+    t = (a = [1, missing, 3],)
+    s = mwetable(t; returnstring = true)
+    @test s ==
+"""
+df = \"\"\"
+a
+1
+
+3
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; ignoreemptyrows=false))"""
+    @test Tables.columntable(eval_mwe(s, :df)) ≅ t
+
+    # ... at either end of the column, and when it is the only row.
+    for t in [(a = [missing, 1],), (a = [1, missing],), (a = [missing],)]
+        s = mwetable(t; returnstring = true)
+        @test Tables.columntable(eval_mwe(s, :df)) ≅ t
+    end
+
+    # Same story for vectors.
+    for x in Any[[1, missing, 3], [missing, 1], [1, missing]]
+        s = mwearray(x; returnstring = true)
+        @test occursin("ignoreemptyrows=false", s)
+        @test eval_mwe(s, :x) ≅ x
+    end
+
+    # All missing case
+    for x in Any[[missing], [missing, missing]]
+        s = mwearray(x; returnstring = true)
+        @test eval_mwe(s, :x) ≅ x
+    end
+
+    # Fine for multi-columns, no need for ignoreemptyrows
+    t = (a = [1, missing], b = [2, 3])
+    s = mwetable(t; returnstring = true)
+    @test !occursin("ignoreemptyrows", s)
+    @test Tables.columntable(eval_mwe(s, :df)) ≅ t
+
+    X = [1 2; missing 4]
+    s = mwearray(X; returnstring = true)
+    @test !occursin("ignoreemptyrows", s)
+    @test eval_mwe(s, :X) ≅ X
+
+    @test mwetable((a = [1, 2], b = [3, 4]); returnstring = true) ==
+"""
+df = \"\"\"
+a,b
+1,3
+2,4
+\"\"\" |> IOBuffer |> CSV.File"""
+    @test mwearray([1, 2]; returnstring = true) ==
+"""
+x = \"\"\"
+1
+2
+\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix |> vec"""
+
+    # A quoted field holding blank lines is not a blank row; opting out anyway
+    # is harmless, so the only requirement is that the data survives.
+    t = (a = ["x\n\ny"], b = [1])
+    @test Tables.columntable(eval_mwe(mwetable(t; returnstring = true), :df)) ≅ t
+
+    # Reading is a separate matter: a blank line on the clipboard is ambiguous
+    # (trailing newlines are common in pasted data), so `cliptable`/`cliparray`
+    # keep `CSV.File`'s default and drop it. The row is therefore already gone
+    # before the MWE is built.
+    cliptable((a = [1, missing, 3],))
+    @test clipboard() == "a\n1\n\n3"
+    @test Tables.columntable(cliptable()) == (a = [1, 3],)
+    @test Tables.columntable(eval_mwe(mwetable(; returnstring = true), :df)) == (a = [1, 3],)
+
+    # Callers who do mean the blank line to be `missing` say so, and it is
+    # forwarded to the read and then preserved by the generated snippet.
+    s = mwetable(; ignoreemptyrows = false, returnstring = true)
+    @test Tables.columntable(eval_mwe(s, :df)) ≅ (a = [1, missing, 3],)
+
+    cliparray([1, missing, 3])
+    @test clipboard() == "1\n\n3"
+    s = mwearray(; ignoreemptyrows = false, returnstring = true)
+    @test eval_mwe(s, :x) ≅ [1, missing, 3]
+end
+
 @testset "name validation" begin
     # `name` is interpolated straight into the generated code, so a name that is
     # not an identifier would silently produce code that does not parse.

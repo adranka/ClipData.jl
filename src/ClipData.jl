@@ -41,6 +41,16 @@ function escapepayload(s)
     return s
 end
 
+hasblankrow(s) = startswith(s, '\n') || occursin("\n\n", s)
+
+# The `CSV.File` call the generated code pipes an `IOBuffer` into.
+function csvfilecall(payload; header = true)
+    kwargs = String[]
+    header || push!(kwargs, "header=false")
+    hasblankrow(payload) && push!(kwargs, "ignoreemptyrows=false")
+    isempty(kwargs) ? "CSV.File" : "(io -> CSV.File(io; $(join(kwargs, ", "))))"
+end
+
 # `CSV.write` terminates the last row with `newline`; the clipboard should not
 # carry that trailing separator.
 function chopnewline(s, newline)
@@ -269,11 +279,10 @@ $name = \"\"\"
     print(main_io, start_str)
 
     CSV.write(table_io, t)
-    print(main_io, escapepayload(String(take!(table_io))))
+    payload = String(take!(table_io))
+    print(main_io, escapepayload(payload))
 
-    end_str = """
-\"\"\" |> IOBuffer |> CSV.File"""
-    print(main_io, end_str)
+    print(main_io, "\"\"\" |> IOBuffer |> ", csvfilecall(payload))
     s = String(take!(main_io))
 
     return mwestring(io, s, returnstring)
@@ -411,11 +420,11 @@ $name = \"\"\"
     print(main_io, start_str)
 
     CSV.write(array_io, Tables.table(t); header=false)
-    print(main_io, escapepayload(String(take!(array_io))))
+    payload = String(take!(array_io))
+    print(main_io, escapepayload(payload))
 
-    end_str = """
-\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix"""
-    print(main_io, end_str)
+    print(main_io, "\"\"\" |> IOBuffer |> ", csvfilecall(payload; header = false),
+          " |> Tables.matrix")
     s = String(take!(main_io))
 
     return mwestring(io, s, returnstring)
@@ -471,11 +480,11 @@ $name = \"\"\"
     print(main_io, start_str)
 
     CSV.write(array_io, Tables.table(t); header=false)
-    print(main_io, escapepayload(String(take!(array_io))))
+    payload = String(take!(array_io))
+    print(main_io, escapepayload(payload))
 
-    end_str = """
-\"\"\" |> IOBuffer |> (io -> CSV.File(io; header=false)) |> Tables.matrix |> vec"""
-    print(main_io, end_str)
+    print(main_io, "\"\"\" |> IOBuffer |> ", csvfilecall(payload; header = false),
+          " |> Tables.matrix |> vec")
     s = String(take!(main_io))
 
     return mwestring(io, s, returnstring)
