@@ -147,7 +147,7 @@ function cliparray(; kwargs...)
 end
 
 """
-    cliptable(t; returnstring = false, delim = '\t', kwargs...)
+    cliptable(t; returnstring = false, delim = '\\t', kwargs...)
 
 Send a Tables.jl-compatible object to the clipboard.
 Default delimiter is tab. Accepts all keyword arguments
