@@ -1,9 +1,9 @@
-push!(LOAD_PATH, "../src/")
-
 using Documenter, ClipData
 
 makedocs(
 	sitename = "ClipData.jl",
+	modules = [ClipData],
+	doctest = false,
 	pages = Any[
 		"Introduction" => "index.md",
 		"API" => "api/api.md"],
