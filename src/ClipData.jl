@@ -41,15 +41,13 @@ constructor.
 ```julia-repl
 julia> # Send string to the clipboard
        \"\"\"
-       a, b
-       1, 2
-       100, 200
+       a,b
+       1,2
+       100,200
        \"\"\" |> clipboard
 
-julia> cliptable()
-2-element CSV.File{false}:
- CSV.Row: (a = 1,  b = 2)
- CSV.Row: (a = 100,  b = 200)
+julia> cliptable() |> Tables.columntable
+(a = [1, 100], b = [2, 200])
 ```
 
 """
@@ -111,11 +109,12 @@ function cliparray(; kwargs...)
 end
 
 """
-    cliptable(t; delim = '\t', kwargs...)
+    cliptable(t; returnstring = false, delim = '\t', kwargs...)
 
 Send a Tables.jl-compatible object to the clipboard.
 Default delimiter is tab. Accepts all keyword arguments
-that can be pased to `CSV.write`.
+that can be passed to `CSV.write`. If `returnstring=true`,
+also return the string sent to the clipboard.
 
 # Example
 
@@ -144,25 +143,23 @@ function cliptable(t; returnstring = false, delim = '\t', newline = '\n', kwargs
 end
 
 """
-    cliparray(t::AbstractVecOrMat; kwargs...)
+    cliparray(t::AbstractVecOrMat; returnstring = false, kwargs...)
 
 Send a `Vector` or `Matrix` to the clipboard.
 Default delimiter is tab and with no header.
 Accepts all keyword arguments that can be passed
-to `CSV.write`.
+to `CSV.write`. If `returnstring=true`, also return
+the string sent to the clipboard.
 
 # Examples
 
 ```julia-repl
-julia> \"\"\"
-       1 2
-       3 4
-       \"\"\" |> clipboard
-
-julia> cliparray()
+julia> X = [1 2; 3 4]
 2×2 Matrix{Int64}:
  1  2
  3  4
+
+julia> cliparray(X)
 ```
 """
 function cliparray(t::AbstractVecOrMat; returnstring = false, delim='\t',
@@ -183,15 +180,16 @@ function cliparray(t::AbstractVecOrMat; returnstring = false, delim='\t',
 end
 
 """
-    mwetable([io::IO=stdout]; name="df", kwargs...)
+    mwetable([io::IO=stdout]; returnstring=false, name="df", kwargs...)
 
 Create a Minimum Working Example (MWE) using
-the clipboard. `tablmwe` prints out a multi-line
+the clipboard. `mwetable` prints out a multi-line
 comma-separated string and provides the necessary
 code to read that string using `CSV.File`.
 The object is assigned the name given by
 `name` (default `"df"`). Prints to `io`,
-which is by default `stdout`.
+which is by default `stdout`, or returns the code
+as a `String` if `returnstring=true`.
 
 # Examples
 
@@ -220,16 +218,17 @@ mwetable(; kwargs...) = mwetable(stdout; kwargs...)
 
 
 """
-    mwetable([io::IO=stdout], t; name="df")
+    mwetable([io::IO=stdout], t; returnstring=false, name="df")
 
 Create a Minimum Working Example (MWE) from
 an existing Tables.jl-compatible object.
-`tablmwe` prints out a multi-line
+`mwetable` prints out a multi-line
 comma-separated string and provides the necessary
 code to read that string using `CSV.File`.
 The object is assigned the name given by
-`name` (default `:df`). Prints to `io`,
-which is by default `stdout`.
+`name` (default `"df"`). Prints to `io`,
+which is by default `stdout`, or returns the code
+as a `String` if `returnstring=true`.
 
 # Examples
 
@@ -285,11 +284,12 @@ end
 
 Create a Minimum Working Example (MWE) from
 an existing Tables.jl-compatible object.
-`tablmwe` prints out a multi-line
+`mwetable` prints out a multi-line
 comma-separated string and provides the necessary
 code to read that string using `CSV.File`. The name
 assigned to the object in the MWE is the
-same as the name of the input object. Prints
+same as the name of the input object, so `t` must be
+a variable name rather than an expression. Prints
 to `stdout`.
 
 # Examples
@@ -312,14 +312,15 @@ macro mwetable(t)
 end
 
 """
-    mwearray([io::IO=stdout]; name=nothing, kwargs...)
+    mwearray([io::IO=stdout]; returnstring=false, name=nothing, kwargs...)
 
 Create a Minimum Working Example (MWE) from
 the clipboard to create an array. `mwearray`
-returns the a multi-line string with the
-code necessary to read the string stored in
-clipboard as a `Vector` or `Matrix`. Prints to `io`,
-which is by default `stdout`. The object is assigned
+prints out a multi-line comma-separated string
+and provides the necessary code to read that string
+back as a `Vector` or `Matrix`. Prints to `io`,
+which is by default `stdout`, or returns the code
+as a `String` if `returnstring=true`. The object is assigned
 the name given by `name`, which defaults to `:X` when
 the clipboard holds a `Matrix` and `:x` when it holds
 a `Vector`.
@@ -348,13 +349,14 @@ end
 mwearray(; kwargs...) = mwearray(stdout; kwargs...)
 
 """
-    mwearray([io::IO=stdout], t::AbstractMatrix; name=:X)
+    mwearray([io::IO=stdout], t::AbstractMatrix; returnstring=false, name=:X)
 
 Create a Minimum Working Example (MWE) from
-a `Matrix`. `mwearray`
-returns the a multi-line string with the
-code necessary to recreate `t`. Prints to `io`,
-which is by default `stdout`.
+a `Matrix`. `mwearray` prints out a multi-line
+comma-separated string and provides the necessary
+code to recreate `t`. Prints to `io`, which is by
+default `stdout`, or returns the code as a `String`
+if `returnstring=true`.
 
 # Examples
 
@@ -396,18 +398,26 @@ $name = \"\"\"
 end
 
 """
-    mwearray([io::IO=stdout], t::AbstractVector; name=:x)
+    mwearray([io::IO=stdout], t::AbstractVector; returnstring=false, name=:x)
 
 Create a Minimum Working Example (MWE) from
-a `Vector`. `mwearray`
-returns the a multi-line string with the
-code necessary to recreate `t`. Prints to `io`,
-which is by default `stdout`.
+a `Vector`. `mwearray` prints out a multi-line
+comma-separated string and provides the necessary
+code to recreate `t`. Prints to `io`, which is by
+default `stdout`, or returns the code as a `String`
+if `returnstring=true`.
 
 # Example
 
 ```julia-repl
-julia> mwearray(x; name=:x)
+julia> x = [1, 2, 3, 4]
+4-element Vector{Int64}:
+ 1
+ 2
+ 3
+ 4
+
+julia> mwearray(x)
 x = \"\"\"
 1
 2
