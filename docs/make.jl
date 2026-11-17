@@ -8,11 +8,11 @@ makedocs(
 		"Introduction" => "index.md",
 		"API" => "api/api.md"],
 	format = Documenter.HTML(
-		canonical = "https://pdeffebach.github.io/ClipData.jl/stable/"
+		canonical = "https://jcunwin.github.io/ClipData.jl/stable/"
 	))
 
 deploydocs(
-    repo = "github.com/pdeffebach/ClipData.jl.git",
+    repo = "github.com/jcunwin/ClipData.jl.git",
     target = "build",
     deps = nothing,
     make = nothing)
